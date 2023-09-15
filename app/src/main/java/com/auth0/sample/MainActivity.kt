@@ -8,8 +8,6 @@ import com.auth0.android.Auth0
 import com.auth0.android.authentication.AuthenticationAPIClient
 import com.auth0.android.authentication.AuthenticationException
 import com.auth0.android.callback.Callback
-import com.auth0.android.management.ManagementException
-import com.auth0.android.management.UsersAPIClient
 import com.auth0.android.provider.WebAuthProvider
 import com.auth0.android.result.Credentials
 import com.auth0.android.result.UserProfile
@@ -39,23 +37,25 @@ class MainActivity : AppCompatActivity() {
         setContentView(binding.root)
         binding.buttonLogin.setOnClickListener { loginWithBrowser() }
         binding.buttonLogout.setOnClickListener { logout() }
-        binding.buttonGetMetadata.setOnClickListener { getUserMetadata() }
-        binding.buttonPatchMetadata.setOnClickListener { patchUserMetadata() }
     }
 
     private fun updateUI() {
         binding.buttonLogout.isEnabled = cachedCredentials != null
-        binding.metadataPanel.isVisible = cachedCredentials != null
         binding.buttonLogin.isEnabled = cachedCredentials == null
         binding.userProfile.isVisible = cachedCredentials != null
 
-        binding.userProfile.text =
-            "Name: ${cachedUserProfile?.name ?: ""}\n" +
-                    "Email: ${cachedUserProfile?.email ?: ""}"
-
-        if (cachedUserProfile == null) {
-            binding.inputEditMetadata.setText("")
-        }
+        ("Name: ${cachedUserProfile?.name ?: ""}\n" +
+                "Email: ${cachedUserProfile?.email ?: ""}\n" +
+                "Nick Name: ${cachedUserProfile?.nickname ?: ""}\n" +
+                "EmpId: ${cachedUserProfile?.getExtraInfo()?.getValue(MappingKeys.AUTH0_EMPLOYEE_ID) ?: "*NA*"}\n" +
+                "City: ${cachedUserProfile?.getExtraInfo()?.getValue(MappingKeys.AUTH0_CITY_NAME) ?: "*NA*"}\n" +
+                "Country: ${cachedUserProfile?.getExtraInfo()?.getValue(MappingKeys.AUTH0_COUNTRY_NAME) ?: "*NA*"}\n" +
+                "Location: ${cachedUserProfile?.getExtraInfo()?.getValue(MappingKeys.AUTH0_LOCATION) ?: "*NA*"}\n" +
+                "Dept.: ${cachedUserProfile?.getExtraInfo()?.getValue(MappingKeys.AUTH0_DEPARTMENT) ?: "*NA*"}\n" +
+                "Company: ${cachedUserProfile?.getExtraInfo()?.getValue(MappingKeys.AUTH0_COMPANY_NAME) ?: "*NA*"}\n" +
+                "Auth0UserId: ${cachedUserProfile?.getExtraInfo()?.getValue(MappingKeys.AUTH0_USER_ID) ?: "*NA*"}\n" +
+                "Updated At: ${cachedUserProfile?.getExtraInfo()?.getValue(MappingKeys.UPDATED_AT) ?: "*NA*"}\n"
+                ).also { binding.userProfile.text = it }
     }
 
     private fun loginWithBrowser() {
@@ -75,10 +75,7 @@ class MainActivity : AppCompatActivity() {
                 override fun onSuccess(credentials: Credentials) {
                     cachedCredentials = credentials
                     showSnackBar("Success: ${credentials.accessToken}")
-                    Log.e(
-                        TAG,
-                        "onSuccess: accessToken = \n${credentials.accessToken}\n\n${credentials.scope} "
-                    )
+                    Log.e(TAG, "onSuccess: accessToken = \n${credentials.accessToken}")
                     updateUI()
                     showUserProfile()
                 }
@@ -105,7 +102,6 @@ class MainActivity : AppCompatActivity() {
 
     private fun showUserProfile() {
         val client = AuthenticationAPIClient(account)
-
         // Use the access token to call userInfo endpoint.
         // In this sample, we can assume cachedCredentials has been initialized by this point.
         client.userInfo(cachedCredentials!!.accessToken!!)
@@ -116,51 +112,31 @@ class MainActivity : AppCompatActivity() {
 
                 override fun onSuccess(result: UserProfile) {
                     cachedUserProfile = result
-                    Log.i(TAG, "showUserProfile onSuccess: ${result.familyName}\n${result.getIdentities()}" +
-                            "\n${result.getExtraInfo()}\n${result.givenName}\n${result.getUserMetadata()}\n")
                     updateUI()
+                    extractDataFromExtraInfoMap(result)
                 }
             })
     }
 
-    private fun getUserMetadata() {
-        // Create the user API client
-        val usersClient = UsersAPIClient(account, cachedCredentials!!.accessToken!!)
+    private fun extractDataFromExtraInfoMap(result: UserProfile) {
+        val userMap = result.getExtraInfo()
 
-        // Get the full user profile
-        usersClient.getProfile(cachedUserProfile!!.getId()!!)
-            .start(object : Callback<UserProfile, ManagementException> {
-                override fun onFailure(exception: ManagementException) {
-                    showSnackBar("Failure: ${exception.getCode()}")
-                }
+        // this model is to be used in calling user registration API in givhero app.
+        val cachedUserFromAuth0 = CachedUserProfileModel(
+            userName = "${result.name}",
+            userNickName = "${result.nickname}",
+            userImageUrl = "${result.pictureURL}",
+            userEmail = "${result.email}",
+            userAuth0UserId = "${userMap.getValue(MappingKeys.AUTH0_USER_ID)}",
+            userCompany = "${userMap.getValue(MappingKeys.AUTH0_COMPANY_NAME)}",
+            userDepartment = "${userMap.getValue(MappingKeys.AUTH0_DEPARTMENT)}",
+            userEmployeeId = "${userMap.getValue(MappingKeys.AUTH0_EMPLOYEE_ID)}",
+            userLocation = "${userMap.getValue(MappingKeys.AUTH0_LOCATION)}",
+            userCity = "${userMap.getValue(MappingKeys.AUTH0_CITY_NAME)}",
+            userCountry = "${userMap.getValue(MappingKeys.AUTH0_COUNTRY_NAME)}",
+        )
 
-                override fun onSuccess(userProfile: UserProfile) {
-                    cachedUserProfile = userProfile
-                    updateUI()
-
-                    val company = userProfile.getUserMetadata()["company"] as String?
-                    binding.inputEditMetadata.setText(company)
-                }
-            })
-    }
-
-    private fun patchUserMetadata() {
-        val usersClient = UsersAPIClient(account, cachedCredentials!!.accessToken!!)
-        val metadata = mapOf("company" to binding.inputEditMetadata.text.toString())
-
-        usersClient
-            .updateMetadata(cachedUserProfile!!.getId()!!, metadata)
-            .start(object : Callback<UserProfile, ManagementException> {
-                override fun onFailure(exception: ManagementException) {
-                    showSnackBar("Failure: ${exception.getCode()}")
-                }
-
-                override fun onSuccess(profile: UserProfile) {
-                    cachedUserProfile = profile
-                    updateUI()
-                    showSnackBar("Successful")
-                }
-            })
+        Log.e(TAG, "extractDataFromExtraInfoMap: ${cachedUserFromAuth0.userCompany}")
     }
 
     private fun showSnackBar(text: String) {
