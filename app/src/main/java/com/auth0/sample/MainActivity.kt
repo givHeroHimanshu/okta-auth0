@@ -27,8 +27,8 @@ class MainActivity : AppCompatActivity() {
     private var cachedUserProfile: UserProfile? = null
 
     /** local storage for user, required params : */
-    private var localApiClient: AuthenticationAPIClient? = null
-    private var localCredentialsManager: CredentialsManager? = null
+    /*private var localApiClient: AuthenticationAPIClient? = null
+    private var localCredentialsManager: CredentialsManager? = null*/
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -42,50 +42,41 @@ class MainActivity : AppCompatActivity() {
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
         binding.buttonLogin.setOnClickListener { loginWithBrowser() }
-        binding.buttonLogout.setOnClickListener { logout() }
+        binding.buttonLogout.setOnClickListener { Auth0CachingHelper.logout(this, account) { isLoggedOut, message ->
+            if (isLoggedOut) {
+                // logout user
+            } else {
+                // show error:
+                Log.e(TAG, "Error: $message")
+            }
+        } }
 
-        handleUserAuth()
+        Auth0CachingHelper.initLocalAuth0Repository(this, account)
+        Auth0CachingHelper.handleUserAuth()
         updateUI()
     }
 
     private fun updateUI() {
 
-        Log.w(TAG, "updateUI: ${localCredentialsManager?.hasValidCredentials()}")
-        binding.buttonLogout.isEnabled = localCredentialsManager?.hasValidCredentials() == true
-        binding.buttonLogin.isEnabled = localCredentialsManager?.hasValidCredentials() == false
-        binding.userProfile.isVisible = localCredentialsManager?.hasValidCredentials() == true
-        binding.textViewWelcome.text = if (localCredentialsManager?.hasValidCredentials() == true) {
+        Log.w(TAG, "updateUI: ${Auth0CachingHelper.isAuthenticated()}")
+        binding.buttonLogout.isEnabled = Auth0CachingHelper.isAuthenticated() == true
+        binding.buttonLogin.isEnabled = Auth0CachingHelper.isAuthenticated() == false
+        binding.userProfile.isVisible = Auth0CachingHelper.isAuthenticated() == true
+        binding.textViewWelcome.text = if (Auth0CachingHelper.isAuthenticated()) {
             "Welcome"
         } else {
             "Log in using the Browser"
         }
 
-        localCredentialsManager?.getCredentials(object :
-            Callback<Credentials, CredentialsManagerException> {
-            override fun onFailure(error: CredentialsManagerException) {
-                Log.e(TAG, "getCredentialsOnFailure: ${error.message}")
+        Auth0CachingHelper.getUserProfile(account = account) { userProfile, message ->
+            Log.i(TAG, "updateUI: $message")
+            cachedUserProfile = userProfile
+            ("Name: ${cachedUserProfile?.name ?: ""}\n" +
+                    "Email: ${cachedUserProfile?.email ?: ""}\n" +
+                    "Nick Name: ${cachedUserProfile?.nickname ?: ""}\n").also {
+                binding.userProfile.text = it
             }
-
-            override fun onSuccess(result: Credentials) {
-                cachedCredentials = result
-                AuthenticationAPIClient(account).userInfo(cachedCredentials?.accessToken ?: "")
-                    .start(object : Callback<UserProfile, AuthenticationException> {
-                        override fun onFailure(error: AuthenticationException) {
-                            Log.e(TAG, "userInfoOnFailure: ${error.message}")
-                        }
-
-                        override fun onSuccess(result: UserProfile) {
-                            cachedUserProfile = result
-
-                            ("Name: ${cachedUserProfile?.name ?: ""}\n" +
-                                    "Email: ${cachedUserProfile?.email ?: ""}\n" +
-                                    "Nick Name: ${cachedUserProfile?.nickname ?: ""}\n").also {
-                                binding.userProfile.text = it
-                            }
-                        }
-                    })
-            }
-        })
+        }
     }
 
     private fun loginWithBrowser() {
@@ -103,65 +94,22 @@ class MainActivity : AppCompatActivity() {
                 }
 
                 override fun onSuccess(credentials: Credentials) {
-                    if (localCredentialsManager != null) {
+                    /*if (localCredentialsManager != null) {
                         localCredentialsManager?.saveCredentials(credentials)
-                    }
+                    }*/
+
+                    // saving the user
+                    Auth0CachingHelper.saveAuth0UserInLocal(credentials)
+
                     cachedCredentials = credentials
                     showSnackBar("Success: ${credentials.accessToken}")
                     showUserProfile()
-                    reAuthenticateUserSilently()
                     updateUI()
                 }
             })
     }
 
-    /** call below function everytime user opens the app, */
-    private fun handleUserAuth() {
-        if (isAuthenticated()) {
-            // normal flow, no need to authenticate
-        } else {
-            // token expired, re-authenticating user again silently
-            reAuthenticateUserSilently()
-        }
-    }
-
-    private fun isAuthenticated(): Boolean {
-        return localCredentialsManager?.hasValidCredentials() == true
-    }
-
-    private fun reAuthenticateUserSilently() {
-        /** For storing a user in local */
-        localApiClient = AuthenticationAPIClient(auth0 = account)
-        localCredentialsManager = CredentialsManager(
-            authenticationClient = localApiClient ?: AuthenticationAPIClient(account),
-            storage = SharedPreferencesStorage(this@MainActivity)
-        )
-
-        localCredentialsManager?.getCredentials(object :
-            Callback<Credentials, CredentialsManagerException> {
-            override fun onSuccess(credential: Credentials) {
-                // Use credentials
-                Log.e(
-                    TAG,
-                    "onSuccess: checking if authenticated = ${localCredentialsManager?.hasValidCredentials()} ${isAuthenticated()}"
-                )
-            }
-
-            override fun onFailure(error: CredentialsManagerException) {
-                // No credentials were previously saved or they couldn't be refreshed
-                Log.e(TAG, "onFailure: ${error.message}")
-            }
-        })
-
-        /**
-         * If the accessToken has expired, the [localCredentialsManager] automatically uses the refreshToken and renews the credentials for you. New credentials will be stored for future access.
-         *
-         * [doc_link] : https://auth0.com/docs/libraries/auth0-android/auth0-android-save-and-renew-tokens
-         *
-         * */
-    }
-
-    private fun logout() {
+    /*private fun logout() {
         WebAuthProvider.logout(account)
             .withScheme(getString(R.string.com_auth0_scheme))
             .start(this, object : Callback<Void?, AuthenticationException> {
@@ -169,7 +117,7 @@ class MainActivity : AppCompatActivity() {
                     // The user has been logged out!
                     cachedCredentials = null
                     cachedUserProfile = null
-                    localCredentialsManager?.clearCredentials()
+                    //localCredentialsManager?.clearCredentials()
                     updateUI()
                 }
 
@@ -178,7 +126,7 @@ class MainActivity : AppCompatActivity() {
                     showSnackBar("Failure: ${exception.getCode()}")
                 }
             })
-    }
+    }*/
 
     private fun showUserProfile() {
         val client = AuthenticationAPIClient(account)
