@@ -45,6 +45,7 @@ class MainActivity : AppCompatActivity() {
         binding.buttonLogout.setOnClickListener { Auth0CachingHelper.logout(this, account) { isLoggedOut, message ->
             if (isLoggedOut) {
                 // logout user
+                updateUI()
             } else {
                 // show error:
                 Log.e(TAG, "Error: $message")
