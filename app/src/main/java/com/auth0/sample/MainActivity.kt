@@ -2,6 +2,7 @@ package com.auth0.sample
 
 import android.os.Bundle
 import android.util.Log
+import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.isVisible
 import com.auth0.android.Auth0
@@ -55,7 +56,30 @@ class MainActivity : AppCompatActivity() {
 
         Auth0CachingHelper.initLocalAuth0Repository(this, account)
         Auth0CachingHelper.handleUserAuth()
-        updateUI()
+        if (Auth0CachingHelper.isAuthenticated()) {
+            fetchUserProfile()
+        } else {
+            updateUI()
+        }
+    }
+
+    private fun fetchUserProfile() {
+        Auth0CachingHelper.getUserProfile(account = account) { userProfile, message ->
+            Log.i(TAG, "updateUI: $message")
+            cachedUserProfile = userProfile
+            if (cachedUserProfile != null) {
+                updateUI()
+            } else {
+                // todo: logout the user (Givhero App)
+                Auth0CachingHelper.logout(this, account) { isLoggedOut, message ->
+                    if (isLoggedOut) {
+                        Toast.makeText(this, message, Toast.LENGTH_LONG).show()
+                        updateUI()
+                    }
+                }
+            }
+
+        }
     }
 
     private fun updateUI() {
@@ -69,15 +93,10 @@ class MainActivity : AppCompatActivity() {
         } else {
             "Log in using the Browser"
         }
-
-        Auth0CachingHelper.getUserProfile(account = account) { userProfile, message ->
-            Log.i(TAG, "updateUI: $message")
-            cachedUserProfile = userProfile
-            ("Name: ${cachedUserProfile?.name ?: ""}\n" +
-                    "Email: ${cachedUserProfile?.email ?: ""}\n" +
-                    "Nick Name: ${cachedUserProfile?.nickname ?: ""}\n").also {
-                binding.userProfile.text = it
-            }
+        ("Name: ${cachedUserProfile?.name ?: ""}\n" +
+                "Email: ${cachedUserProfile?.email ?: ""}\n" +
+                "Nick Name: ${cachedUserProfile?.nickname ?: ""}\n").also {
+            binding.userProfile.text = it
         }
     }
 
@@ -139,7 +158,7 @@ class MainActivity : AppCompatActivity() {
 
                 override fun onSuccess(result: UserProfile) {
                     cachedUserProfile = result
-                    updateUI()
+                    fetchUserProfile()
                     //extractDataFromExtraInfoMap(result)
                 }
             })
