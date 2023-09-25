@@ -6,6 +6,17 @@
     android:layout_height="match_parent"
     tools:context=".MainActivity">
 
+    <Button
+        android:id="@+id/button_exp"
+        android:layout_width="200dp"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="36dp"
+        android:text="Force Login"
+        android:textAllCaps="false"
+        app:layout_constraintEnd_toEndOf="@+id/textViewWelcome"
+        app:layout_constraintStart_toStartOf="@+id/textViewWelcome"
+        app:layout_constraintBottom_toTopOf="@+id/textViewWelcome" />
+
     <TextView
         android:id="@+id/textViewWelcome"
         android:layout_width="wrap_content"

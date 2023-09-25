@@ -129,6 +129,10 @@ object Auth0CachingHelper {
                         }
 
                         override fun onSuccess(result: UserProfile) {
+                            Log.i(TAG, "onSuccess: UserProfile = ${result.getExtraInfo()}\n")
+                            Log.i(TAG, "onSuccess: UserProfile ID = ${result.getId()}\n")
+                            Log.i(TAG, "onSuccess: AccessToken = ${cachedCredentials?.accessToken}\n")
+                            Log.i(TAG, "onSuccess: Expire time = ${cachedCredentials?.expiresAt}\n Refresh token= ${cachedCredentials?.refreshToken}\n Id token= ${cachedCredentials?.idToken}\n")
                             cachedUserProfile = result
                             callback(cachedUserProfile, "Profile fetched successfully.")
                         }

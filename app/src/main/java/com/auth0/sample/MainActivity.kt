@@ -42,6 +42,7 @@ class MainActivity : AppCompatActivity() {
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
         binding.buttonLogin.setOnClickListener { loginWithBrowser() }
+        binding.buttonExp.setOnClickListener { loginWithBrowser() }
         binding.buttonLogout.setOnClickListener { Auth0CachingHelper.logout(this, account) { isLoggedOut, message ->
             if (isLoggedOut) {
                 // logout user
@@ -84,10 +85,10 @@ class MainActivity : AppCompatActivity() {
         // Setup the WebAuthProvider, using the custom scheme and scope.
         WebAuthProvider.login(account)
             .withScheme(getString(R.string.com_auth0_scheme))
-            .withScope("openid profile email read:current_user update:current_user_metadata")
+            //.withScope("openid profile email offline_access read:current_user update:current_user_metadata")
+            .withScope("openid profile email offline_access read:current_user update:current_user_metadata read:device_credentials read:current_user_device_credentials")
             .withAudience("https://${getString(R.string.com_auth0_domain)}/api/v2/")
-
-            // Launch the authentication passing the callback where the results will be received
+            .withTrustedWebActivity()
             .start(this, object : Callback<Credentials, AuthenticationException> {
                 override fun onFailure(exception: AuthenticationException) {
                     Log.e(TAG, "onFailure: ${exception.getCode()} ${exception.message}")
@@ -95,10 +96,6 @@ class MainActivity : AppCompatActivity() {
                 }
 
                 override fun onSuccess(credentials: Credentials) {
-                    /*if (localCredentialsManager != null) {
-                        localCredentialsManager?.saveCredentials(credentials)
-                    }*/
-
                     // saving the user
                     Auth0CachingHelper.saveAuth0UserInLocal(credentials)
 
